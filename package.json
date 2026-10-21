@@ -1,13 +1,13 @@
 {
   "name": "tizentube-gv",
   "appName": "TizenTube GV",
-  "version": "1.15.2-gv.4",
-  "description": "TizenTube 1.15.2 + video routed via home proxy",
+  "version": "1.15.2-gv.5",
+  "description": "TizenTube 1.15.2 + video routed via home proxy + local diagnostics agent",
   "packageType": "mods",
   "websiteURL": "https://youtube.com/tv?additionalDataUrl=http%3A%2F%2Flocalhost%3A8085%2Fdial%2Fapps%2FYouTube",
   "main": "dist/userScript-v3.js",
   "author": "Reis Can (TizenTube), GV patch by Rux1500",
-  "serviceFile": "dist/service.js",
+  "serviceFile": "dist/service-v5.js",
   "keys": [
     "MediaPlayPause",
     "MediaPlay",
