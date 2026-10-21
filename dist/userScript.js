@@ -1,35 +1,24 @@
-/* TizenTube-GV v2: routes googlevideo.com video traffic through the home proxy (gv.87.232.123.112.nip.io).
-   Rewrites stream URLs inside YouTube API responses (JSON.parse / Response.json / Response.text) and also hooks fetch/XHR.
+/* TizenTube-GV v3: rewrites *.googlevideo.com -> *.c.youtube.com (same Google video servers, valid *.c.youtube.com cert).
+   With the home DNS, *.youtube.com goes through the home SNI router, so video bypasses the ISP block.
+   Rewrites stream URLs inside API responses (JSON.parse / Response.text / Response.json / XHR) and hooks fetch/XHR/media src.
    Stock TizenTube 1.15.2 follows below. */
 (function () {
   if (window.__ttgvHooked) return;
   window.__ttgvHooked = true;
-  var HOST = 'gv.87.232.123.112.nip.io';
-  var PROXY = 'https://' + HOST + '/';
-  var RE_URL = /^(?:https?:)?\/\/([a-z0-9-]+)\.googlevideo\.com\//i;
-  // plain:   https://rr1---sn-x.googlevideo.com/
-  var RE_PLAIN = /https?:\/\/([a-z0-9-]+)\.googlevideo\.com\//gi;
-  // json-escaped: https:\/\/rr1---sn-x.googlevideo.com\/
-  var RE_ESC = /https?:\\\/\\\/([a-z0-9-]+)\.googlevideo\.com\\\//gi;
-  // url-encoded: https%3A%2F%2Frr1---sn-x.googlevideo.com%2F
-  var RE_ENC = /https?%3A%2F%2F([a-z0-9-]+)\.googlevideo\.com%2F/gi;
-  var ENC_PROXY = encodeURIComponent(PROXY);
-  var ESC_PROXY = PROXY.replace(/\//g, '\\/');
+  var RE_ANY = /\.googlevideo\.com/gi;
+  var RE_URL = /^((?:https?:)?\/\/[a-z0-9.-]*?)\.googlevideo\.com(?=[\/:?#]|$)/i;
   function rwText(t) {
     if (typeof t !== 'string' || t.indexOf('googlevideo.com') === -1) return t;
-    return t.replace(RE_PLAIN, function (m, h) { return PROXY + h + '/'; })
-            .replace(RE_ESC, function (m, h) { return ESC_PROXY + h + '\\/'; })
-            .replace(RE_ENC, function (m, h) { return ENC_PROXY + h + '%2F'; });
+    return t.replace(RE_ANY, '.c.youtube.com');
   }
   function rw(u) {
     try {
-      if (typeof u === 'string') return u.replace(RE_URL, function (m, h) { return PROXY + h + '/'; });
+      if (typeof u === 'string') return u.replace(RE_URL, '$1.c.youtube.com');
       if (typeof URL !== 'undefined' && u instanceof URL) return rw(String(u));
     } catch (e) {}
     return u;
   }
-  window.__ttgv = { rw: rw, rwText: rwText, hits: 0 };
-  // 1) JSON.parse (YouTube TV parses innertube player responses with it)
+  window.__ttgv = { rw: rw, rwText: rwText, hits: 0, v: 3 };
   var op = JSON.parse;
   JSON.parse = function (text, reviver) {
     if (typeof text === 'string' && text.indexOf('googlevideo.com') !== -1) {
@@ -38,17 +27,11 @@
     }
     return op.call(this, text, reviver);
   };
-  // 2) Response.text / Response.json
   try {
     var ot = Response.prototype.text;
-    Response.prototype.text = function () {
-      return ot.call(this).then(rwText);
-    };
-    Response.prototype.json = function () {
-      return ot.call(this).then(function (t) { return JSON.parse(t); });
-    };
+    Response.prototype.text = function () { return ot.call(this).then(rwText); };
+    Response.prototype.json = function () { return ot.call(this).then(function (t) { return JSON.parse(t); }); };
   } catch (e) {}
-  // 3) XHR responseText for JSON responses
   try {
     var d = Object.getOwnPropertyDescriptor(XMLHttpRequest.prototype, 'responseText');
     if (d && d.get) {
@@ -58,13 +41,13 @@
       });
     }
   } catch (e) {}
-  // 4) direct request hooks (in case the player uses our patched globals)
   var of = window.fetch;
   if (of) {
     window.fetch = function (input, init) {
       try {
-        if (typeof Request !== 'undefined' && input instanceof Request && RE_URL.test(input.url)) {
-          input = new Request(rw(input.url), input);
+        if (typeof Request !== 'undefined' && input instanceof Request) {
+          var nu = rw(input.url);
+          if (nu !== input.url) input = new Request(nu, input);
         } else {
           input = rw(input);
         }
@@ -88,8 +71,7 @@
       });
     }
   } catch (e) {}
-  // beacon so the server log shows the hook is alive
-  try { (new Image()).src = PROXY + 'ttgv-alive/ping?v=2&t=' + Date.now(); } catch (e) {}
+  try { (new Image()).src = 'https://redirector.c.youtube.com/generate_204?ttgv=3&t=' + Date.now(); } catch (e) {}
 })();
 
 !function(){"use strict";function e(e){if(!e)return e;try{"string"==typeof e&&e.startsWith("//")&&(e=e.replace("//","https://"));var t=new URL(e,window.location.origin),i=t.hostname;if("youtube.com"===i||"www.youtube.com"===i)return t.protocol="http:",t.host="localhost:8099",t.toString();if(i.endsWith("googlevideo.com")||i.endsWith("youtube.com")||i.endsWith("gstatic.com")||i.endsWith(".google.com")||i.endsWith(".googleapis.com")||i.endsWith("googleusercontent.com")||i.endsWith(".ggpht.com"))return"http://localhost:8099/cors-bypass/"+t.toString()}catch(e){console.error("Failed to parse URL during interception:",e)}return e}var t,i=[{architecture:"Linux arm64-v8a",os:"Android 10",rasterizer:"gles",manufacturer:"Sony",deviceType:"ATV",chipsetModel:"sdm845",modelYear:13140765,firmwareVersion:"52.1.C.0.268",brand:"KDDI",model:"SOV38"},{architecture:"Linux armeabi-v7a",os:"Android 14",rasterizer:"gles",manufacturer:"Google",deviceType:"ATV",chipsetModel:"sabrina",modelYear:2020,firmwareVersion:"UTTC.250917.004",brand:"google",model:"Chromecast"},{architecture:"Linux armeabi-v7a",os:"Android 12",rasterizer:"gles",manufacturer:"TCL",deviceType:"ATV",chipsetModel:"merak",modelYear:2023,firmwareVersion:"STT2.221228.001",brand:"TCL",model:"Smart TV Pro"},{architecture:"Linux armeabi-v7a",os:"Android 7.1.2",rasterizer:"gles",manufacturer:"Amazon",deviceType:"ATV",chipsetModel:"mt8695",modelYear:0,firmwareVersion:"NS6294",brand:"Amazon",model:"AFTMM"}];if(document.querySelector(".content-container")&&window.h5vcc&&window.h5vcc.tizentube&&window.h5vcc.tizentube.SetUserAgent){var n=localStorage.getItem("userAgent");n&&(window.h5vcc.tizentube.SetUserAgent(n),location.reload());var a=i[Math.floor(Math.random()*i.length)],o=`Mozilla/5.0 (${(t=a).architecture}; ${t.os}) Cobalt/25.lts.30.1034958-gold (unlike Gecko) v8/8.8.278.17-jit ${t.rasterizer} Starboard/15, ${t.manufacturer}_${t.deviceType}_${t.chipsetModel}_${t.modelYear}/${t.firmwareVersion} (${t.brand}, ${t.model}) com.google.android.youtube.tv/5.30.301`;localStorage.setItem("userAgent",o),window.h5vcc.tizentube.SetUserAgent(o),location.reload()}function r(e,t){(null==t||t>e.length)&&(t=e.length);for(var i=0,n=Array(t);i<t;i++)n[i]=e[i];return n}function s(e){if(Array.isArray(e))return e}function l(e,t,i){if("function"==typeof e?e===t:e.has(t))return arguments.length<3?t:i;throw new TypeError("Private element is not present on this object")}function u(e,t,i,n,a,o,r){try{var s=e[o](r),l=s.value}catch(e){return void i(e)}s.done?t(l):Promise.resolve(l).then(n,a)}function d(e){return function(){var t=this,i=arguments;return new Promise(function(n,a){var o=e.apply(t,i);function r(e){u(o,n,a,r,s,"next",e)}function s(e){u(o,n,a,r,s,"throw",e)}r(void 0)})}}function c(e,t){if(t.has(e))throw new TypeError("Cannot initialize the same private elements twice on an object")}function p(e,t){return e.get(l(e,t))}function h(e,t,i){c(e,t),t.set(e,i)}function m(e,t,i){return e.set(l(e,t),i),i}function g(e,t){c(e,t),t.add(e)}function b(e,t){var i="undefined"!=typeof Symbol&&e[Symbol.iterator]||e["@@iterator"];if(!i){if(Array.isArray(e)||(i=A(e))||t&&e&&"number"==typeof e.length){i&&(e=i);var n=0,a=function(){};return{s:a,n:function(){return n>=e.length?{done:!0}:{done:!1,value:e[n++]}},e:function(e){throw e},f:a}}throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}var o,r=!0,s=!1;return{s:function(){i=i.call(e)},n:function(){var e=i.next();return r=e.done,e},e:function(e){s=!0,o=e},f:function(){try{r||null==i.return||i.return()}finally{if(s)throw o}}}}function v(e,t,i){return(t=function(e){var t=function(e,t){if("object"!=typeof e||!e)return e;var i=e[Symbol.toPrimitive];if(void 0!==i){var n=i.call(e,t||"default");if("object"!=typeof n)return n;throw new TypeError("@@toPrimitive must return a primitive value.")}return("string"===t?String:Number)(e)}(e,"string");return"symbol"==typeof t?t:t+""}(t))in e?Object.defineProperty(e,t,{value:i,enumerable:!0,configurable:!0,writable:!0}):e[t]=i,e}function f(){throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}function y(e,t){var i=Object.keys(e);if(Object.getOwnPropertySymbols){var n=Object.getOwnPropertySymbols(e);t&&(n=n.filter(function(t){return Object.getOwnPropertyDescriptor(e,t).enumerable})),i.push.apply(i,n)}return i}function S(e){for(var t=1;t<arguments.length;t++){var i=null!=arguments[t]?arguments[t]:{};t%2?y(Object(i),!0).forEach(function(t){v(e,t,i[t])}):Object.getOwnPropertyDescriptors?Object.defineProperties(e,Object.getOwnPropertyDescriptors(i)):y(Object(i)).forEach(function(t){Object.defineProperty(e,t,Object.getOwnPropertyDescriptor(i,t))})}return e}function k(){
