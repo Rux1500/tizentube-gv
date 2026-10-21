@@ -1,7 +1,7 @@
 {
   "name": "tizentube-gv",
   "appName": "TizenTube GV",
-  "version": "1.15.2-gv.1",
+  "version": "1.15.2-gv.2",
   "description": "TizenTube 1.15.2 + video routed via home proxy",
   "packageType": "mods",
   "websiteURL": "https://youtube.com/tv?additionalDataUrl=http%3A%2F%2Flocalhost%3A8085%2Fdial%2Fapps%2FYouTube",
